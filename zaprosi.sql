@@ -1,30 +1,47 @@
--- 1. Количество измерений по каждому пользователю
-SELECT u.id, u.name, COUNT(b.id) AS total_batches
+-- 1. Каждый пользователь имеет одинаковое количество измерений (пачек)?
+SELECT 
+    u.id AS user_id, 
+    u.name AS user_name, 
+    COUNT(DISTINCT b.code) AS total_batches
 FROM users u
 LEFT JOIN batches b ON u.id = b.operator_id
 GROUP BY u.id, u.name
 ORDER BY u.id;
 
--- 2. Проверка отсутствия пустых/ошибочных записей
-SELECT * FROM batches 
-WHERE operator_id IS NULL OR parameter_id IS NULL;
+-- 2. У нас нет пустых пачек измерения?
+SELECT * 
+FROM batches 
+WHERE code IS NULL 
+   OR operator_id IS NULL 
+   OR parameter_id IS NULL 
+   OR measured_value IS NULL;
 
--- 3. Количество измерений по каждому параметру
-SELECT p.name AS parameter_name, COUNT(b.id) AS total_measurements
-FROM parameters p
-LEFT JOIN batches b ON p.id = b.parameter_id
-GROUP BY p.name
-ORDER BY p.name;
+-- 3. Каждая пачка измерений содержит полное количество параметров (5 шт)?
+SELECT 
+    code AS batch_code, 
+    operator_id, 
+    COUNT(parameter_id) AS parameters_count
+FROM batches
+GROUP BY code, operator_id
+ORDER BY batch_code;
 
--- 4. Список всех параметров и их типов
-SELECT p.id, p.name AS parameter_name, pt.name AS type_name
-FROM parameters p
-JOIN parameter_types pt ON p.parameter_type_id = pt.id
-ORDER BY p.id;
+-- 4. Все значения, которые сформировал ИИ, корректны и в рамках нужного нам диапазона?
+SELECT 
+    p.name AS parameter_name,
+    MIN(b.measured_value) AS min_value,
+    MAX(b.measured_value) AS max_value,
+    AVG(b.measured_value) AS avg_value
+FROM batches b
+JOIN parameters p ON b.parameter_id = p.id
+GROUP BY p.name;
 
--- 5. Единицы измерения параметров и их базовые величины
-SELECT p.name AS parameter_name, mu.name AS unit_symbol, bu.name AS base_unit_name
-FROM parameters p
+-- 5. Все единицы измерения верны и корректны по отношению к указанным параметрам?
+SELECT DISTINCT
+    p.name AS parameter_name,
+    mu.name AS unit_name,
+    bu.name AS base_unit_name
+FROM batches b
+JOIN parameters p ON b.parameter_id = p.id
 JOIN measurement_units mu ON p.unit_id = mu.id
 JOIN base_units bu ON mu.base_unit_id = bu.id
-ORDER BY p.id;
+ORDER BY p.name;
