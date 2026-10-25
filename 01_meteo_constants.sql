@@ -1,14 +1,5 @@
--- =====================================================================
--- 01_meteo_constants.sql
--- Хранение констант (п. 6 задания): структуры + функции доступа.
--- Запускать ПЕРВЫМ.
--- =====================================================================
-
 CREATE SCHEMA IF NOT EXISTS meteo;
 
--- ---------------------------------------------------------------------
--- 1. Общие константы (нормальные условия, смещения кодирования и т.п.)
--- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS meteo.constants (
     const_code  text    PRIMARY KEY,
     num_value   numeric,
@@ -20,9 +11,6 @@ CREATE TABLE IF NOT EXISTS meteo.constants (
 
 COMMENT ON TABLE meteo.constants IS 'Константы расчёта Метео-приближенного';
 
--- ---------------------------------------------------------------------
--- 2. Допустимые диапазоны входных параметров (для проверки корректности)
--- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS meteo.param_limits (
     param_code  text    PRIMARY KEY,
     param_name  text    NOT NULL,
@@ -34,9 +22,6 @@ CREATE TABLE IF NOT EXISTS meteo.param_limits (
 
 COMMENT ON TABLE meteo.param_limits IS 'Допустимые диапазоны входных параметров метеоизмерений';
 
--- ---------------------------------------------------------------------
--- 3. Начальное наполнение (идемпотентно)
--- ---------------------------------------------------------------------
 INSERT INTO meteo.constants (const_code, num_value, unit, description) VALUES
     ('NORM_PRESSURE',       750,  'мм рт. ст.', 'Табличное (нормальное) давление у земли'),
     ('NORM_TEMPERATURE',    15.9, '°C',         'Табличная температура у земли'),
@@ -60,9 +45,6 @@ ON CONFLICT (param_code) DO UPDATE
     SET param_name = EXCLUDED.param_name, min_value = EXCLUDED.min_value,
         max_value  = EXCLUDED.max_value,  unit      = EXCLUDED.unit;
 
--- ---------------------------------------------------------------------
--- 4. Функции доступа к константам
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION meteo.fn_const_num(p_code text)
 RETURNS numeric
 LANGUAGE plpgsql
