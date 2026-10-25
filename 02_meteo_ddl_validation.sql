@@ -1,18 +1,3 @@
--- =====================================================================
--- 02_meteo_ddl_validation.sql
--- П. 1 задания:
---   * расширение DDL (информация об ошибках входных параметров)
---   * новый тип данных "Список параметров"
---   * функция проверки корректности параметров
--- Запускать ПОСЛЕ 01_meteo_constants.sql
--- =====================================================================
-
--- ---------------------------------------------------------------------
--- 0. Базовые таблицы.
---    Исходная DDL в задании не видна, поэтому структура принята как
---    предположение. Если таблицы уже есть - CREATE IF NOT EXISTS
---    ничего не изменит, а ALTER ниже добавит только колонки ошибок.
--- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS meteo.users (
     id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     full_name  text NOT NULL
@@ -43,9 +28,6 @@ CREATE TABLE IF NOT EXISTS meteo.measurements (     -- входные парам
     bullet_drift_range  numeric(8,2)                -- дальность сноса пуль, м
 );
 
--- ---------------------------------------------------------------------
--- 1. Расширение DDL: информация об ошибках
--- ---------------------------------------------------------------------
 ALTER TABLE meteo.measurements
     ADD COLUMN IF NOT EXISTS has_error   boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS error_count int     NOT NULL DEFAULT 0,
@@ -58,9 +40,6 @@ COMMENT ON COLUMN meteo.measurements.error_text  IS 'Описание ошибо
 CREATE INDEX IF NOT EXISTS ix_measurements_batch ON meteo.measurements (batch_id);
 CREATE INDEX IF NOT EXISTS ix_measurements_user  ON meteo.measurements (user_id);
 
--- ---------------------------------------------------------------------
--- 2. Новый тип данных: список параметров
--- ---------------------------------------------------------------------
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -82,10 +61,6 @@ BEGIN
 END;
 $$;
 
--- ---------------------------------------------------------------------
--- 3. Вспомогательная функция: проверка одного значения по диапазону
---    Возвращает NULL, если всё в порядке, иначе текст ошибки.
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION meteo.fn_check_range(p_param text, p_value numeric)
 RETURNS text
 LANGUAGE plpgsql
@@ -117,9 +92,6 @@ BEGIN
 END;
 $$;
 
--- ---------------------------------------------------------------------
--- 4. Проверка корректности параметров -> массив ошибок
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION meteo.fn_validate_params_arr(p meteo.t_meteo_params)
 RETURNS text[]
 LANGUAGE plpgsql
@@ -149,11 +121,6 @@ BEGIN
 END;
 $$;
 
--- ---------------------------------------------------------------------
--- 5. Проверка корректности параметров -> строка со списком ошибок
---    Вход: тип со списком параметров. Выход: строка ошибок через "; "
---    или NULL, если ошибок нет.
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION meteo.fn_validate_params(p meteo.t_meteo_params)
 RETURNS text
 LANGUAGE sql
@@ -162,9 +129,6 @@ AS $$
     SELECT NULLIF(array_to_string(meteo.fn_validate_params_arr(p), '; '), '');
 $$;
 
--- ---------------------------------------------------------------------
--- 6. Триггер: автоматически заполняет has_error / error_count / error_text
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION meteo.trg_measurements_validate()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -192,8 +156,3 @@ CREATE TRIGGER trg_measurements_validate
 
 -- Пересчёт ошибок для уже существующих строк (сработает триггер)
 UPDATE meteo.measurements SET equipment_type_id = equipment_type_id;
-
--- ---------------------------------------------------------------------
--- Пример вызова:
---   SELECT meteo.fn_validate_params(ROW(1, 120, 99, 745, 400, 5, 10)::meteo.t_meteo_params);
--- ---------------------------------------------------------------------
